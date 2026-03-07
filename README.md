@@ -250,7 +250,3 @@ The test suite covers:
 - If OpenAL HRTF is unavailable on a machine, the game falls back to its non-HRTF playback path.
 - `pygame` may emit a `pkg_resources` deprecation warning depending on the local Python environment. That warning comes from the dependency stack, not from the game logic itself.
 - The project is designed to be maintainable and easy to extend. New mechanics should be added to dedicated modules instead of being folded into a single file.
-
-## Credits
-
-This project was developed collaboratively by Oguzhan and OpenAI Codex. The design, implementation, refactoring, accessibility work, audio systems, progression systems, testing, and open-source packaging were carried out through that collaboration.
