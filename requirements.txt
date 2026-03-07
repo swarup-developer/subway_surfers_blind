@@ -1,0 +1,3 @@
+pygame>=2.1
+accessible_output2>=0.14
+pyopenalsoft>=1.0.0
