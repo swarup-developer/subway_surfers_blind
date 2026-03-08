@@ -254,6 +254,7 @@ class SubwayBlindGame:
         self._update_ready_announced = False
         self.controls = ControllerSupport(settings)
         self._binding_capture: BindingCaptureRequest | None = None
+        self._selected_binding_device = "controller" if self.controls.active_controller() is not None else "keyboard"
 
         self.pause_menu = Menu(
             self.speaker,
@@ -489,15 +490,49 @@ class SubwayBlindGame:
         self.shop_menu.items[3].label = self._shop_score_booster_label()
 
     def _build_controls_menu(self) -> None:
+        self._sync_selected_binding_device()
         items = [
             MenuItem(f"Active Input: {self.controls.current_input_label()}", "announce_active_input"),
-            MenuItem("Keyboard Bindings", "keyboard_bindings"),
+            MenuItem(f"Binding Profile: {self._selected_binding_profile_label()}", "select_binding_profile"),
+            MenuItem("Customize Bindings", "open_selected_bindings"),
+            MenuItem(f"Reset {self._selected_binding_profile_label()}", "reset_selected_bindings"),
         ]
-        if self.controls.active_controller() is not None:
-            items.append(MenuItem(f"{family_label(self.controls.current_controller_family())} Bindings", "controller_bindings"))
         items.append(MenuItem("Back", "back"))
         self.controls_menu.items = items
         self.controls_menu.title = "Controls"
+
+    def _sync_selected_binding_device(self) -> None:
+        if self.controls.active_controller() is None:
+            self._selected_binding_device = "keyboard"
+            return
+        if self._selected_binding_device not in {"keyboard", "controller"}:
+            self._selected_binding_device = "controller"
+            return
+        if self.controls.last_input_source == "controller":
+            self._selected_binding_device = "controller"
+
+    def _selected_binding_profile_label(self) -> str:
+        if self._selected_binding_device == "controller" and self.controls.active_controller() is not None:
+            return family_label(self.controls.current_controller_family())
+        return "Keyboard"
+
+    def _cycle_selected_binding_device(self, direction: int) -> None:
+        if direction not in (-1, 1):
+            return
+        available_devices = ["keyboard"]
+        if self.controls.active_controller() is not None:
+            available_devices.append("controller")
+        if len(available_devices) == 1:
+            self._play_menu_feedback("menuedge")
+            return
+        try:
+            current_index = available_devices.index(self._selected_binding_device)
+        except ValueError:
+            current_index = 0
+        self._selected_binding_device = available_devices[(current_index + direction) % len(available_devices)]
+        self._play_menu_feedback("confirm")
+        self._build_controls_menu()
+        self.speaker.speak(self.controls_menu.items[1].label, interrupt=True)
 
     def _build_keyboard_bindings_menu(self) -> None:
         items = []
@@ -1062,6 +1097,9 @@ class SubwayBlindGame:
             return True
         if self.active_menu == self.options_menu and key in (pygame.K_LEFT, pygame.K_RIGHT):
             return True
+        if self.active_menu == self.controls_menu and key in (pygame.K_LEFT, pygame.K_RIGHT):
+            selected_action = self.controls_menu.items[self.controls_menu.index].action if self.controls_menu.items else ""
+            return selected_action == "select_binding_profile"
         return False
 
     def _prime_menu_repeat(self, key: int) -> None:
@@ -1109,6 +1147,7 @@ class SubwayBlindGame:
         self._release_menu_repeat(key)
 
     def _announce_controller_connected(self, name: str, family: str) -> None:
+        self._selected_binding_device = "controller"
         self._refresh_control_menus()
         self.speaker.speak(
             f"{family_label(family)} connected. Open Controls in Options to review bindings.",
@@ -1116,6 +1155,7 @@ class SubwayBlindGame:
         )
 
     def _announce_controller_disconnected(self, name: str, family: str) -> None:
+        self._selected_binding_device = "keyboard"
         self._refresh_control_menus()
         self.speaker.speak(f"{family_label(family)} disconnected. Keyboard controls remain available.", interrupt=True)
 
@@ -1262,6 +1302,14 @@ class SubwayBlindGame:
                 if selected_action in {"back", "opt_controls"}:
                     return self._handle_menu_action(selected_action)
                 return True
+        if self.active_menu == self.controls_menu:
+            if key in (pygame.K_LEFT, pygame.K_RIGHT):
+                selected_action = self.controls_menu.items[self.controls_menu.index].action
+                if selected_action == "select_binding_profile":
+                    self._cycle_selected_binding_device(-1 if key == pygame.K_LEFT else 1)
+                else:
+                    self._play_menu_feedback("menuedge")
+                return True
         if self.active_menu == self.learn_sounds_menu:
             if key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 selected_action = self.learn_sounds_menu.items[self.learn_sounds_menu.index].action
@@ -1371,6 +1419,7 @@ class SubwayBlindGame:
 
         if self.active_menu == self.options_menu:
             if action == "opt_controls":
+                self._selected_binding_device = "controller" if self.controls.active_controller() is not None else "keyboard"
                 self._refresh_control_menus()
                 self._set_active_menu(self.controls_menu)
                 return True
@@ -1387,17 +1436,37 @@ class SubwayBlindGame:
                     interrupt=True,
                 )
                 return True
-            if action == "keyboard_bindings":
+            if action == "select_binding_profile":
+                self.speaker.speak(self.controls_menu.items[self.controls_menu.index].label, interrupt=True)
+                return True
+            if action == "open_selected_bindings":
+                if self._selected_binding_device == "controller":
+                    if self.controls.active_controller() is None:
+                        self._play_menu_feedback("menuedge")
+                        self.speaker.speak("No controller connected.", interrupt=True)
+                        return True
+                    self._build_controller_bindings_menu()
+                    self._set_active_menu(self.controller_bindings_menu)
+                    return True
                 self._build_keyboard_bindings_menu()
                 self._set_active_menu(self.keyboard_bindings_menu)
                 return True
-            if action == "controller_bindings":
-                if self.controls.active_controller() is None:
-                    self._play_menu_feedback("menuedge")
-                    self.speaker.speak("No controller connected.", interrupt=True)
+            if action == "reset_selected_bindings":
+                if self._selected_binding_device == "controller":
+                    if self.controls.active_controller() is None:
+                        self._play_menu_feedback("menuedge")
+                        self.speaker.speak("No controller connected.", interrupt=True)
+                        return True
+                    family = self.controls.current_controller_family()
+                    self.controls.reset_controller_bindings(family)
+                    self._build_controls_menu()
+                    self._play_menu_feedback("confirm")
+                    self.speaker.speak(f"{family_label(family)} bindings reset to recommended defaults.", interrupt=True)
                     return True
-                self._build_controller_bindings_menu()
-                self._set_active_menu(self.controller_bindings_menu)
+                self.controls.reset_keyboard_bindings()
+                self._build_controls_menu()
+                self._play_menu_feedback("confirm")
+                self.speaker.speak("Keyboard bindings reset to defaults.", interrupt=True)
                 return True
             if action == "back":
                 self._refresh_options_menu_labels()
@@ -1416,7 +1485,7 @@ class SubwayBlindGame:
                 return True
             if action == "back":
                 self._build_controls_menu()
-                self._set_active_menu(self.controls_menu, start_index=1)
+                self._set_active_menu(self.controls_menu, start_index=2)
                 return True
 
         if self.active_menu == self.controller_bindings_menu:
@@ -1436,7 +1505,7 @@ class SubwayBlindGame:
                 return True
             if action == "back":
                 self._build_controls_menu()
-                self._set_active_menu(self.controls_menu, start_index=2 if self.controls.active_controller() is not None else 1)
+                self._set_active_menu(self.controls_menu, start_index=2)
                 return True
 
         if self.active_menu == self.update_menu:

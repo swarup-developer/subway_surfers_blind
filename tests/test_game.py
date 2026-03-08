@@ -1512,25 +1512,38 @@ class GameTests(unittest.TestCase):
         self.assertEqual(game.main_menu.index, 0)
         self.assertIn(("menuclose", "ui", False), audio.played)
 
-    def test_controls_menu_only_shows_keyboard_bindings_without_controller(self):
+    def test_controls_menu_defaults_to_keyboard_without_controller(self):
         game, _, _ = self.make_game()
 
         game._refresh_control_menus()
 
         self.assertEqual(
             [item.label for item in game.controls_menu.items],
-            ["Active Input: Keyboard", "Keyboard Bindings", "Back"],
+            [
+                "Active Input: Keyboard",
+                "Binding Profile: Keyboard",
+                "Customize Bindings",
+                "Reset Keyboard",
+                "Back",
+            ],
         )
 
-    def test_controls_menu_shows_connected_controller_family(self):
+    def test_controls_menu_defaults_to_connected_controller_profile(self):
         game, _, _ = self.make_game()
         self.attach_controller(game, family=PLAYSTATION_FAMILY, name="Wireless Controller")
+        game._selected_binding_device = "controller"
 
         game._refresh_control_menus()
 
         self.assertEqual(
             [item.label for item in game.controls_menu.items],
-            ["Active Input: Keyboard", "Keyboard Bindings", "PlayStation Controller Bindings", "Back"],
+            [
+                "Active Input: Keyboard",
+                "Binding Profile: PlayStation Controller",
+                "Customize Bindings",
+                "Reset PlayStation Controller",
+                "Back",
+            ],
         )
 
     def test_options_controls_entry_opens_controls_menu(self):
@@ -1542,6 +1555,45 @@ class GameTests(unittest.TestCase):
 
         self.assertTrue(result)
         self.assertIs(game.active_menu, game.controls_menu)
+        self.assertEqual(game.controls_menu.items[1].label, "Binding Profile: Keyboard")
+
+    def test_options_controls_entry_prefers_controller_profile_when_connected(self):
+        game, _, _ = self.make_game()
+        self.attach_controller(game, family=PLAYSTATION_FAMILY, name="Wireless Controller")
+        game.active_menu = game.options_menu
+        game.options_menu.index = 11
+
+        result = game._handle_active_menu_key(pygame.K_RETURN)
+
+        self.assertTrue(result)
+        self.assertIs(game.active_menu, game.controls_menu)
+        self.assertEqual(game.controls_menu.items[1].label, "Binding Profile: PlayStation Controller")
+
+    def test_controls_menu_can_switch_binding_profile_like_options(self):
+        game, speaker, _ = self.make_game()
+        self.attach_controller(game, family=PLAYSTATION_FAMILY, name="Wireless Controller")
+        game.active_menu = game.controls_menu
+        game.controls_menu.index = 1
+        game._selected_binding_device = "keyboard"
+        game._build_controls_menu()
+
+        game._handle_active_menu_key(pygame.K_RIGHT)
+
+        self.assertEqual(game.controls_menu.items[1].label, "Binding Profile: PlayStation Controller")
+        self.assertEqual(speaker.messages[-1][0], "Binding Profile: PlayStation Controller")
+
+    def test_controls_menu_customize_uses_selected_controller_profile(self):
+        game, _, _ = self.make_game()
+        self.attach_controller(game, family=PLAYSTATION_FAMILY, name="Wireless Controller")
+        game.active_menu = game.controls_menu
+        game._selected_binding_device = "controller"
+        game._build_controls_menu()
+        game.controls_menu.index = 2
+
+        result = game._handle_active_menu_key(pygame.K_RETURN)
+
+        self.assertTrue(result)
+        self.assertIs(game.active_menu, game.controller_bindings_menu)
 
     def test_keyboard_binding_capture_updates_menu_confirm(self):
         game, speaker, _ = self.make_game()
