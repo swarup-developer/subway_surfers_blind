@@ -84,45 +84,6 @@ The main menu includes a dedicated sound library browser so players can preview 
 ### Economy and rewards
 
 - Persistent coin bank
-- Coins collected during runs are banked after the run ends
-- Mystery Boxes now speak in two clear steps:
-  first `Opening Mystery Box.`, then a second announcement explains the reward, such as coins, a key, a hoverboard, or another item
-- Shop purchases using banked coins
-- Persistent inventory for hoverboards, headstarts, score boosters, and keys
-
-## Progression Systems
-
-The game now includes progression layers inspired by the original game's meta loop.
-
-### Missions
-
-- Multi-goal mission sets
-- Mission progress is tracked across runs
-- Completing a mission set increases the permanent score multiplier
-- At the multiplier cap, mission completion grants a Super Mystery Box instead
-
-### Word Hunt
-
-- Daily word target
-- Letter pickups spawn during runs
-- Completing the word grants a reward
-- Consecutive daily completions increase the streak reward
-- High streak rewards can unlock a Super Mystery Box
-
-### Season Hunt
-
-- Seasonal token pickups spawn during runs
-- Token thresholds unlock staged rewards
-- Reward path includes coins, keys, headstarts, and a Super Mystery Box
-
-### Super Mystery Box
-
-The upgraded reward box can grant larger economy and inventory rewards, including:
-
-- Banked coins
-- Hoverboards
-- Jetpack reward:
-  a major reward outcome that gives the player a jetpack power-up instead of only coins or inventory items
 - Keys
 - Hoverboards
 - Headstarts
@@ -138,20 +99,6 @@ The upgraded reward box can grant larger economy and inventory rewards, includin
 - Reward thresholds and unlockable milestone payouts
 
 ### Distribution features
-- Main Menu
-- Run Setup
-- Shop
-- Options
-- How to Play
-- Pause Menu
-- Revive Menu
-- Game Over dialog with score/details at the top and `Run again` / `Main menu` actions at the bottom
-
-### Game Over flow
-
-- When a run ends, the game first announces `Game Over.`
-- After a short pause, focus moves to the score row so screen-reader output does not overlap
-- The player can use the arrow keys to review score, coins, death reason, and the bottom action buttons
 
 - In-game GitHub Releases update check
 - Download-and-install update flow for packaged builds
@@ -180,10 +127,6 @@ The game now supports keyboard plus SDL-compatible Xbox and PlayStation controll
 - `Space`: activate hoverboard
 - `Escape`: pause
 - `M`: toggle speech
-- `R`: announce coins collected in the current run
-- `Escape`: pause / back out of menus
-- `Enter`: confirm menu item
-- `M`: toggle speech on or off during a run
 
 ### Default controller layout
 
@@ -450,26 +393,6 @@ pytest -q
 ```
 
 The repository currently includes a large `tests/test_game.py` suite that exercises the game logic heavily without requiring manual play.
-
-## Building a Windows Executable
-- Audio channel and pan behavior
-- HRTF source handling
-- Spatial threat prompting
-- Speed balancing
-- Spawn safety and route reachability
-- Shop and reward logic
-- Revive behavior
-- Game Over dialog flow and announcement timing
-- Progression systems such as missions, Word Hunt, and Season Hunt
-
-### Run power-ups
-
-- Magnet
-- Jetpack:
-  while active, the player flies above ground hazards, automatically collects nearby coin lines, and cannot perform normal lane-change or jump/roll actions until the jetpack expires
-- Double score
-- Super Sneakers
-- Hoverboard shield
 
 ## Building a Windows Executable
 

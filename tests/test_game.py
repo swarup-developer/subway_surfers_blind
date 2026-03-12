@@ -925,7 +925,7 @@ class SpatialAudioTests(unittest.TestCase):
         self.assertGreater(gain, 0.0)
         self.assertGreater(pitch, 0.9)
         self.assertIsNotNone(fallback_pan)
-        self.assertGreater(velocity_z, 0.0)
+        self.assertLess(velocity_z, 0.0)
 
     def test_critical_prompt_interrupts_current_screen_reader_speech(self):
         engine = SpatialThreatAudio()
@@ -956,7 +956,17 @@ class SpatialAudioTests(unittest.TestCase):
         cue = engine.build_threat_cues(0, 20.0, [obstacle])[0]
 
         self.assertGreater(cue.source_z, 0.0)
+        self.assertGreater(cue.velocity_z, 0.0)
         self.assertIsNone(cue.prompt)
+
+    def test_obstacle_height_changes_vertical_spatial_position(self):
+        engine = SpatialThreatAudio()
+
+        high_cue = engine.build_threat_cues(0, 20.0, [Obstacle(kind="high", lane=0, z=6.0)])[0]
+        low_cue = engine.build_threat_cues(0, 20.0, [Obstacle(kind="low", lane=0, z=6.0)])[0]
+
+        self.assertGreater(high_cue.source_y, 0.0)
+        self.assertLess(low_cue.source_y, 0.0)
 
 
 class SpawnDirectorTests(unittest.TestCase):
@@ -980,7 +990,21 @@ class SpawnDirectorTests(unittest.TestCase):
         ):
             director.choose_pattern(0.0)
 
-        self.assertEqual(director.support_lane(), 1)
+        with patch("subway_blind.spawn.random.choice", return_value=-1), patch(
+            "subway_blind.spawn.random.choices",
+            return_value=[1],
+        ):
+            self.assertEqual(director.support_lane(0), 1)
+
+    def test_support_lane_can_spawn_in_front_of_current_lane(self):
+        director = SpawnDirector()
+        director.last_safe_lane = 0
+
+        with patch("subway_blind.spawn.random.choice", return_value=-1), patch(
+            "subway_blind.spawn.random.choices",
+            return_value=[1],
+        ):
+            self.assertEqual(director.support_lane(1), 1)
 
     def test_candidate_patterns_expand_single_lane_templates_across_all_lanes(self):
         director = SpawnDirector()
@@ -989,6 +1013,27 @@ class SpawnDirectorTests(unittest.TestCase):
         single_train_variants = [pattern for pattern in candidates if pattern.name.startswith("single_train:")]
 
         self.assertEqual({pattern.entries[0].lane for pattern in single_train_variants}, {-1, 0, 1})
+
+    def test_easy_difficulty_filters_out_harder_patterns_at_same_progress(self):
+        director = SpawnDirector()
+
+        easy_candidates = director.candidate_patterns(0.4, difficulty="easy")
+        normal_candidates = director.candidate_patterns(0.4, difficulty="normal")
+
+        easy_names = {pattern.name.split(":")[0] for pattern in easy_candidates}
+        normal_names = {pattern.name.split(":")[0] for pattern in normal_candidates}
+
+        self.assertNotIn("stagger_jump_route", easy_names)
+        self.assertIn("stagger_jump_route", normal_names)
+
+    def test_easy_difficulty_spaces_encounters_farther_than_hard(self):
+        director = SpawnDirector()
+
+        with patch("subway_blind.spawn.random.uniform", return_value=1.5):
+            easy_gap = director.next_encounter_gap(0.5, difficulty="easy")
+            hard_gap = director.next_encounter_gap(0.5, difficulty="hard")
+
+        self.assertGreater(easy_gap, hard_gap)
 
     def test_transformed_pattern_updates_safe_lanes_with_lane_shift(self):
         shifted = SpawnDirector._transform_pattern(PATTERNS[0], 1, -1)
@@ -1421,6 +1466,7 @@ class GameTests(unittest.TestCase):
         self.assertEqual(game.settings["bank_coins"], 49)
         self.assertIn(("coin_gui", "ui", False), audio.played)
         self.assertIn(("gui_cash", "ui2", False), audio.played)
+        self.assertEqual(audio.music_started_tracks[-1], "menu")
 
     def test_multiple_headstarts_extend_start_duration_and_consume_all_selected_charges(self):
         game, _, _ = self.make_game()
@@ -1462,11 +1508,11 @@ class GameTests(unittest.TestCase):
             game.spawn_director,
             "base_spawn_distance",
             side_effect=[29.0, 34.0],
-        ), patch.object(game.spawn_director, "choose_coin_lane", return_value=0), patch.object(
+        ), patch.object(game.spawn_director, "choose_coin_lane", return_value=1), patch.object(
             game,
             "_choose_support_spawn_kind",
             return_value="key",
-        ), patch.object(game.spawn_director, "support_lane", return_value=0):
+        ), patch.object(game.spawn_director, "support_lane", return_value=1):
             game._spawn_things(0.016)
 
         hazards = [obstacle for obstacle in game.obstacles if obstacle.kind in {"train", "low", "high"}]
@@ -1476,9 +1522,17 @@ class GameTests(unittest.TestCase):
         self.assertEqual(len(hazards), 2)
         self.assertEqual({obstacle.lane for obstacle in hazards}, {-1, 1})
         self.assertEqual(len(coins), 6)
-        self.assertTrue(all(obstacle.lane == 0 for obstacle in coins))
+        self.assertTrue(all(obstacle.lane == 1 for obstacle in coins))
         self.assertEqual(len(keys), 1)
-        self.assertEqual(keys[0].lane, 0)
+        self.assertEqual(keys[0].lane, 1)
+
+    def test_update_game_clamps_invalid_player_lane_back_onto_track(self):
+        game, _, _ = self.make_game()
+        game.player.lane = 4
+
+        game._update_game(0.016)
+
+        self.assertEqual(game.player.lane, 1)
 
     def test_spawn_things_delays_when_existing_hazard_is_too_close(self):
         game, _, _ = self.make_game()
@@ -2011,7 +2065,8 @@ class GameTests(unittest.TestCase):
         game._on_hit()
 
         self.assertIs(game.active_menu, game.game_over_menu)
-        self.assertEqual(audio.music_stopped, 1)
+        self.assertEqual(audio.music_stopped, 0)
+        self.assertEqual(audio.music_started_tracks[-1], "menu")
         self.assertEqual(game.settings["bank_coins"], 8)
         self.assertEqual(
             [item.label for item in game.game_over_menu.items],
@@ -2271,7 +2326,8 @@ class GameTests(unittest.TestCase):
         game._on_hit()
 
         self.assertIs(game.active_menu, game.game_over_menu)
-        self.assertEqual(audio.music_stopped, 1)
+        self.assertEqual(audio.music_stopped, 0)
+        self.assertEqual(audio.music_started_tracks[-1], "menu")
         self.assertEqual(speaker.messages[-1], ("Game Over.", True))
 
     def test_game_over_dialog_defers_score_announcement_until_delay_expires(self):
@@ -2341,6 +2397,21 @@ class GameTests(unittest.TestCase):
         game._draw_menu(game.main_menu)
 
         self.assertEqual(game.screen.get_size(), (320, 240))
+
+    def test_handle_window_resize_enforces_minimum_window_size(self):
+        game, _, _ = self.make_game()
+
+        game._handle_window_event(pygame.event.Event(pygame.VIDEORESIZE, w=320, h=200))
+
+        self.assertEqual(game.screen.get_size(), (640, 360))
+
+    def test_window_size_changed_refreshes_screen_reference(self):
+        game, _, _ = self.make_game()
+        resized = pygame.display.set_mode((700, 420), pygame.RESIZABLE)
+
+        game._handle_window_event(pygame.event.Event(pygame.WINDOWSIZECHANGED, x=700, y=420))
+
+        self.assertIs(game.screen, resized)
 
 
 if __name__ == "__main__":

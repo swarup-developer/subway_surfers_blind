@@ -148,15 +148,22 @@ class SpatialThreatAudio:
         else:
             pan = lane_to_pan(obstacle.lane)
         relative_lane = obstacle.lane - player_lane
-        source_x = relative_lane * 1.7
-        source_y = -0.1
-        source_z = max(-TRAIN_FRONT_TRACKING_DISTANCE, min(TRAIN_REAR_TRACKING_DISTANCE, -signed_distance * 0.95))
+        width_scale = 1.55 + closeness * 0.85
+        if obstacle.kind == "train":
+            width_scale += 0.3
+        source_x = relative_lane * width_scale
+        source_y = self._source_height_for_obstacle(obstacle.kind, closeness)
+        source_z = max(-TRAIN_FRONT_TRACKING_DISTANCE, min(TRAIN_REAR_TRACKING_DISTANCE, -signed_distance))
         velocity_x = 0.0
         velocity_y = 0.0
-        velocity_z = max(4.0, speed * 0.95)
+        if signed_distance >= 0:
+            velocity_z = -max(4.0, speed * (0.92 + closeness * 0.18))
+        else:
+            velocity_z = max(3.0, speed * 0.55)
         pitch = 0.92 + closeness * 0.24
         if signed_distance < 0:
             pitch = max(0.82, pitch - 0.08)
+            gain *= 0.88
         prompt = self._prompt_for_obstacle(player_lane, obstacle, signed_distance, speed_factor, lane_threats)
         return ThreatCue(
             lane=obstacle.lane,
@@ -174,6 +181,18 @@ class SpatialThreatAudio:
             pitch=max(0.75, min(1.3, pitch)),
             prompt=prompt,
         )
+
+    @staticmethod
+    def _source_height_for_obstacle(kind: str, closeness: float) -> float:
+        if kind == "high":
+            return 0.2 + closeness * 0.12
+        if kind == "low":
+            return -0.42 + closeness * 0.08
+        if kind == "bush":
+            return -0.18
+        if kind == "train":
+            return -0.02
+        return -0.1
 
     def _prompt_for_obstacle(
         self,

@@ -47,7 +47,7 @@ from subway_blind.features import (
     score_booster_bonus,
 )
 from subway_blind.menu import Menu, MenuItem
-from subway_blind.models import LANES, Obstacle, Player, RunState, lane_name, lane_to_pan
+from subway_blind.models import LANES, Obstacle, Player, RunState, lane_name, lane_to_pan, normalize_lane
 from subway_blind.progression import (
     can_claim_season_reward,
     claim_season_reward,
@@ -83,6 +83,8 @@ LEARN_SOUND_PREVIEW_CHANNEL = "learn_sound_preview"
 LEARN_SOUND_LOOP_PREVIEW_DURATION = 2.6
 HEADSTART_SHAKE_CHANNEL = "intro_headstart_shake"
 HEADSTART_SPRAY_CHANNEL = "intro_headstart_spray"
+MIN_WINDOW_WIDTH = 640
+MIN_WINDOW_HEIGHT = 360
 
 
 @dataclass(frozen=True)
@@ -861,6 +863,9 @@ class SubwayBlindGame:
             return
         self.audio.music_start("menu")
 
+    def _difficulty_key(self) -> str:
+        return str(self.settings.get("difficulty", "normal")).strip().lower()
+
     def _request_exit(self) -> None:
         if self._exit_requested:
             return
@@ -888,6 +893,7 @@ class SubwayBlindGame:
         self.game_over_menu.opened = True
         self.game_over_menu.index = 0
         self._pending_menu_announcement = (self.game_over_menu, 0.45)
+        self._sync_music_context()
         self.speaker.speak("Game Over.", interrupt=True)
 
     def _mission_goals(self):
@@ -1305,6 +1311,17 @@ class SubwayBlindGame:
                 return
             self._process_translated_keyup(translated_key)
 
+    def _handle_window_event(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.VIDEORESIZE:
+            width = max(MIN_WINDOW_WIDTH, int(getattr(event, "w", MIN_WINDOW_WIDTH)))
+            height = max(MIN_WINDOW_HEIGHT, int(getattr(event, "h", MIN_WINDOW_HEIGHT)))
+            self.screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
+            return
+        if event.type == pygame.WINDOWSIZECHANGED:
+            surface = pygame.display.get_surface()
+            if surface is not None:
+                self.screen = surface
+
     def _handle_controller_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.CONTROLLERDEVICEADDED:
             connected = self.controls.register_added_controller(getattr(event, "device_index", None))
@@ -1355,6 +1372,8 @@ class SubwayBlindGame:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self._request_exit()
+                elif event.type in (pygame.VIDEORESIZE, pygame.WINDOWSIZECHANGED):
+                    self._handle_window_event(event)
                 elif event.type in (pygame.KEYDOWN, pygame.KEYUP):
                     self._handle_keyboard_event(event)
                 elif event.type in (
@@ -1938,9 +1957,10 @@ class SubwayBlindGame:
         if self.state.paused or self.player.jetpack > 0 or self.player.headstart > 0:
             return
 
+        self.player.lane = normalize_lane(self.player.lane)
         if key == pygame.K_LEFT:
-            if self.player.lane > -1:
-                self.player.lane -= 1
+            if self.player.lane > LANES[0]:
+                self.player.lane = normalize_lane(self.player.lane - 1)
                 self._record_mission_event("dodges")
                 self.audio.play("dodge", pan=lane_to_pan(self.player.lane), channel="move")
                 if self.settings.get("announce_lane", True):
@@ -1948,8 +1968,8 @@ class SubwayBlindGame:
             else:
                 self.audio.play("menuedge", channel="ui")
         elif key == pygame.K_RIGHT:
-            if self.player.lane < 1:
-                self.player.lane += 1
+            if self.player.lane < LANES[-1]:
+                self.player.lane = normalize_lane(self.player.lane + 1)
                 self._record_mission_event("dodges")
                 self.audio.play("dodge", pan=lane_to_pan(self.player.lane), channel="move")
                 if self.settings.get("announce_lane", True):
@@ -2000,6 +2020,7 @@ class SubwayBlindGame:
         self.speaker.speak("Hoverboard active.", interrupt=False)
 
     def _update_game(self, delta_time: float) -> None:
+        self.player.lane = normalize_lane(self.player.lane)
         self.state.time += delta_time
         base_speed = self.speed_profile.speed_for_elapsed(self.state.time)
         self.state.speed = base_speed + HEADSTART_SPEED_BONUS if self.player.headstart > 0 else base_speed
@@ -2135,38 +2156,56 @@ class SubwayBlindGame:
         self.state.next_coinline -= delta_time
         self.state.next_support -= delta_time
         progress = self.speed_profile.progress(self.state.time)
+        difficulty = self._difficulty_key()
 
         if self.state.next_spawn <= 0:
             if self.spawn_director.should_delay_spawn(self.obstacles):
                 self.state.next_spawn = 0.3
             else:
-                pattern = self._choose_playable_pattern(progress)
+                pattern = self._choose_playable_pattern(progress, difficulty)
                 if pattern is None:
                     self.state.next_spawn = 0.35
                 else:
                     chosen_pattern, distance = pattern
                     self._spawn_pattern(chosen_pattern, distance)
-                    self.state.next_spawn = max(0.85, self.spawn_director.next_encounter_gap(progress))
+                    minimum_gap = 1.05 if difficulty == "easy" else 0.85
+                    self.state.next_spawn = max(
+                        minimum_gap,
+                        self.spawn_director.next_encounter_gap(progress, difficulty=difficulty),
+                    )
 
         if self.state.next_coinline <= 0:
             lane = self.spawn_director.choose_coin_lane(self.player.lane)
-            self._spawn_coin_line(lane, start_distance=self.spawn_director.base_spawn_distance(progress, self.state.speed) - 7.5)
-            self.state.next_coinline = max(1.55, self.spawn_director.next_coin_gap(progress))
+            self._spawn_coin_line(
+                lane,
+                start_distance=self.spawn_director.base_spawn_distance(
+                    progress,
+                    self.state.speed,
+                    difficulty=difficulty,
+                )
+                - 7.5,
+            )
+            self.state.next_coinline = max(1.55, self.spawn_director.next_coin_gap(progress, difficulty=difficulty))
 
         if self.state.next_support <= 0:
             kind = self._choose_support_spawn_kind()
-            lane = self.spawn_director.support_lane()
-            distance = self.spawn_director.base_spawn_distance(progress, self.state.speed) + 1.5
+            lane = self.spawn_director.support_lane(self.player.lane)
+            distance = self.spawn_director.base_spawn_distance(
+                progress,
+                self.state.speed,
+                difficulty=difficulty,
+            ) + 1.5
             self._spawn_support_collectible(kind, lane, distance)
-            self.state.next_support = max(5.5, self.spawn_director.next_support_gap(progress))
+            self.state.next_support = max(5.5, self.spawn_director.next_support_gap(progress, difficulty=difficulty))
 
     def _spawn_pattern(self, pattern: RoutePattern, base_distance: float) -> None:
         for entry in pattern.entries:
             self.obstacles.append(Obstacle(kind=entry.kind, lane=entry.lane, z=base_distance + entry.z_offset))
 
-    def _choose_playable_pattern(self, progress: float) -> Optional[tuple[RoutePattern, float]]:
-        for pattern in self.spawn_director.candidate_patterns(progress):
-            distance = self.spawn_director.base_spawn_distance(progress, self.state.speed)
+    def _choose_playable_pattern(self, progress: float, difficulty: str | None = None) -> Optional[tuple[RoutePattern, float]]:
+        selected_difficulty = difficulty or self._difficulty_key()
+        for pattern in self.spawn_director.candidate_patterns(progress, difficulty=selected_difficulty):
+            distance = self.spawn_director.base_spawn_distance(progress, self.state.speed, difficulty=selected_difficulty)
             if not self.spawn_director.pattern_is_playable(
                 pattern,
                 distance,
@@ -2465,7 +2504,6 @@ class SubwayBlindGame:
         summary_reason = death_reason or self._last_death_reason or "Run ended after crash"
         self.speaker.speak(f"Run over. Score {int(self.state.score)}. {summary_reason}.", interrupt=True)
         self._commit_run_rewards()
-        self.audio.music_stop()
         self.audio.stop("loop_guard")
         self.audio.stop("loop_magnet")
         self.audio.stop("loop_jetpack")

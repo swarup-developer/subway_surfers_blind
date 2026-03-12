@@ -14,7 +14,7 @@ def main() -> None:
     settings["audio_output_device"] = initialize_mixer_output(settings.get("audio_output_device")) or ""
 
     pygame.display.set_caption(f"{APP_WINDOW_TITLE} {APP_VERSION}")
-    screen = pygame.display.set_mode((900, 600))
+    screen = pygame.display.set_mode((900, 600), pygame.RESIZABLE)
     clock = pygame.time.Clock()
 
     game = SubwayBlindGame(screen, clock, settings)

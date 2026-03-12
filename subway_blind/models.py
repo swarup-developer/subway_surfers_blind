@@ -5,12 +5,16 @@ from dataclasses import dataclass
 LANES = (-1, 0, 1)
 
 
+def normalize_lane(lane: int) -> int:
+    return max(LANES[0], min(LANES[-1], int(lane)))
+
+
 def lane_to_pan(lane: int) -> float:
-    return float(lane) * 0.9
+    return float(normalize_lane(lane)) * 0.9
 
 
 def lane_name(lane: int) -> str:
-    return {-1: "Left lane", 0: "Center lane", 1: "Right lane"}.get(lane, "Lane")
+    return {-1: "Left lane", 0: "Center lane", 1: "Right lane"}.get(normalize_lane(lane), "Lane")
 
 
 @dataclass

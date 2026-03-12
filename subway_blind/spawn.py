@@ -3,11 +3,36 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
-from subway_blind.models import LANES, Obstacle
+from subway_blind.models import LANES, Obstacle, normalize_lane
 
 TRAIN_FRONT_BUFFER = 18.0
 SLICE_LENGTH = 2.4
 TRACKED_HAZARDS = {"train", "low", "high", "bush"}
+DIFFICULTY_PROGRESS_SCALE = {
+    "easy": 0.55,
+    "normal": 1.0,
+    "hard": 1.18,
+}
+DIFFICULTY_ENCOUNTER_GAP_OFFSET = {
+    "easy": 0.22,
+    "normal": 0.0,
+    "hard": -0.08,
+}
+DIFFICULTY_COIN_GAP_OFFSET = {
+    "easy": 0.12,
+    "normal": 0.0,
+    "hard": -0.06,
+}
+DIFFICULTY_SUPPORT_GAP_OFFSET = {
+    "easy": 0.9,
+    "normal": 0.0,
+    "hard": -0.45,
+}
+DIFFICULTY_SPAWN_DISTANCE_OFFSET = {
+    "easy": 3.8,
+    "normal": 0.0,
+    "hard": -1.2,
+}
 
 
 @dataclass(frozen=True)
@@ -67,26 +92,51 @@ class SpawnDirector:
     def reset(self) -> None:
         self.last_safe_lane = 0
 
-    def next_encounter_gap(self, progress: float) -> float:
-        return random.uniform(1.45, 1.7) - progress * 0.32
+    def _difficulty_progress(self, progress: float, difficulty: str) -> float:
+        scale = DIFFICULTY_PROGRESS_SCALE.get(str(difficulty), 1.0)
+        return max(0.0, min(1.0, float(progress) * scale))
 
-    def next_coin_gap(self, progress: float) -> float:
-        return random.uniform(2.3, 3.0) - progress * 0.3
+    @staticmethod
+    def _difficulty_offset(mapping: dict[str, float], difficulty: str) -> float:
+        return float(mapping.get(str(difficulty), 0.0))
 
-    def next_support_gap(self, progress: float) -> float:
-        return random.uniform(9.0, 12.5) - progress * 1.2
+    def next_encounter_gap(self, progress: float, difficulty: str = "normal") -> float:
+        adjusted_progress = self._difficulty_progress(progress, difficulty)
+        return random.uniform(1.45, 1.7) - adjusted_progress * 0.32 + self._difficulty_offset(
+            DIFFICULTY_ENCOUNTER_GAP_OFFSET,
+            difficulty,
+        )
 
-    def base_spawn_distance(self, progress: float, speed: float) -> float:
-        near = 31.0 + progress * 2.0
-        far = 37.0 + progress * 3.0
+    def next_coin_gap(self, progress: float, difficulty: str = "normal") -> float:
+        adjusted_progress = self._difficulty_progress(progress, difficulty)
+        return random.uniform(2.3, 3.0) - adjusted_progress * 0.3 + self._difficulty_offset(
+            DIFFICULTY_COIN_GAP_OFFSET,
+            difficulty,
+        )
+
+    def next_support_gap(self, progress: float, difficulty: str = "normal") -> float:
+        adjusted_progress = self._difficulty_progress(progress, difficulty)
+        return random.uniform(9.0, 12.5) - adjusted_progress * 1.2 + self._difficulty_offset(
+            DIFFICULTY_SUPPORT_GAP_OFFSET,
+            difficulty,
+        )
+
+    def base_spawn_distance(self, progress: float, speed: float, difficulty: str = "normal") -> float:
+        adjusted_progress = self._difficulty_progress(progress, difficulty)
+        near = 31.0 + adjusted_progress * 2.0
+        far = 37.0 + adjusted_progress * 3.0
         far += min(3.0, (speed - 18.0) * 0.18)
+        difficulty_offset = self._difficulty_offset(DIFFICULTY_SPAWN_DISTANCE_OFFSET, difficulty)
+        near += difficulty_offset
+        far += difficulty_offset
         return random.uniform(near, far)
 
-    def candidate_patterns(self, progress: float) -> list[RoutePattern]:
+    def candidate_patterns(self, progress: float, difficulty: str = "normal") -> list[RoutePattern]:
+        adjusted_progress = self._difficulty_progress(progress, difficulty)
         pool: list[RoutePattern] = []
         seen: set[tuple[tuple[tuple[str, int, float], ...], tuple[int, ...]]] = set()
         for pattern in PATTERNS:
-            if pattern.min_progress > progress:
+            if pattern.min_progress > adjusted_progress:
                 continue
             for candidate in self._pattern_variants(pattern):
                 signature = self._pattern_signature(candidate)
@@ -96,8 +146,8 @@ class SpawnDirector:
                 pool.append(candidate)
         return sorted(pool, key=lambda pattern: random.random() / max(0.001, pattern.weight))
 
-    def choose_pattern(self, progress: float) -> RoutePattern:
-        pattern = self.candidate_patterns(progress)[0]
+    def choose_pattern(self, progress: float, difficulty: str = "normal") -> RoutePattern:
+        pattern = self.candidate_patterns(progress, difficulty=difficulty)[0]
         self.last_safe_lane = random.choice(pattern.safe_lanes)
         return pattern
 
@@ -105,9 +155,10 @@ class SpawnDirector:
         self.last_safe_lane = random.choice(pattern.safe_lanes)
 
     def choose_coin_lane(self, current_lane: int) -> int:
-        candidates = [self.last_safe_lane, current_lane, random.choice(LANES)]
+        current_lane = normalize_lane(current_lane)
+        candidates = [current_lane, self.last_safe_lane, random.choice(LANES)]
         weights = [0.55, 0.3, 0.15]
-        return random.choices(candidates, weights=weights, k=1)[0]
+        return normalize_lane(random.choices(candidates, weights=weights, k=1)[0])
 
     def choose_support_kind(self) -> str:
         return random.choices(
@@ -116,8 +167,11 @@ class SpawnDirector:
             k=1,
         )[0]
 
-    def support_lane(self) -> int:
-        return self.last_safe_lane
+    def support_lane(self, current_lane: int) -> int:
+        current_lane = normalize_lane(current_lane)
+        candidates = [current_lane, self.last_safe_lane, random.choice(LANES)]
+        weights = [0.55, 0.35, 0.1]
+        return normalize_lane(random.choices(candidates, weights=weights, k=1)[0])
 
     def should_delay_spawn(self, obstacles: list[Obstacle]) -> bool:
         nearest_hazard = min(

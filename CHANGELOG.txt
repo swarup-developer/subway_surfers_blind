@@ -1,0 +1,43 @@
+Subway Surfers Blind Edition
+Changelog
+
+Date: 2026-03-10
+Version: 0.1.0
+Title: Audio, Difficulty, and Lane Spawn Update
+
+Update Summary
+- Improved HRTF and spatial audio so obstacle placement feels more believable in 3D space.
+- Refined hazard cues with clearer left-right spread, depth, and obstacle height positioning.
+- Added direction-aware hazard velocity so approaching warnings sound more natural before and after passing.
+
+Gameplay Changes
+- Balanced difficulty more clearly across Easy, Normal, and Hard.
+- Easy mode now delays harder train setups and leaves more space between hazards.
+- Hard mode now introduces tighter pressure and earlier hazard density than Normal.
+- Fixed the lane escape bug by clamping the player back onto the valid three-lane track.
+- Adjusted coin and support spawning so pickups can appear more naturally in front of the player instead of favoring the center lane.
+
+Flow and Menu Updates
+- Fixed the game-over and return-to-menu music flow.
+- Menu music now starts as soon as the game-over menu opens.
+- Returning to the main menu after a run now keeps menu music consistent instead of waiting for another menu interaction.
+
+Display Updates
+- Made the game window resizable.
+- Enforced a minimum window size to keep menus and gameplay readable.
+
+------------------------------------------------------------
+
+Template For Future Entries
+Date: YYYY-MM-DD
+Version: x.y.z
+Title: Short update title
+
+Update Summary
+- Short summary item
+
+Gameplay Changes
+- Change item
+
+Audio or UI Updates
+- Change item

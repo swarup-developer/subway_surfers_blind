@@ -727,9 +727,9 @@ class Audio:
 
     def _hrtf_profile(self, key: str, channel: str, pan: Optional[float]) -> tuple[float, float, float, float, bool]:
         clamped_pan = 0.0 if pan is None else max(-1.0, min(1.0, float(pan)))
-        x = clamped_pan * 1.8
+        x = clamped_pan * 1.95
         y = 0.0
-        z = -1.4
+        z = -1.55
         pitch = 1.0
         relative = False
 
@@ -750,8 +750,10 @@ class Audio:
             y = 0.1
 
         if key == "train_pass":
-            z = -4.0
-            pitch = 0.92
+            z = -5.4
+            x = clamped_pan * 2.6
+            y = -0.08
+            pitch = 0.9
         elif key in {"warning", "menumove", "menuedge", "menuopen", "menuclose", "confirm"}:
             z = -0.8
             relative = True
