@@ -1,28 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_submodules
 
-from pathlib import Path
-
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules
-
-
-hiddenimports = collect_submodules("accessible_output2.outputs") + [
-    "pyopenalsoft",
-    "pygame._sdl2.audio",
-    "win32com.client",
-]
-binaries = collect_dynamic_libs("pyopenalsoft")
-
-project_root = Path(SPEC).resolve().parent
-datas = [
-    (str(project_root / "assets"), "assets"),
-]
+binaries = []
+hiddenimports = ['accessible_output2.outputs', 'pyopenalsoft', 'pygame._sdl2.audio', 'win32com.client']
+binaries += collect_dynamic_libs('pyopenalsoft')
+hiddenimports += collect_submodules('accessible_output2.outputs')
 
 
 a = Analysis(
-    [str(project_root / "main.py")],
-    pathex=[str(project_root)],
+    ['main.py'],
+    pathex=[],
     binaries=binaries,
-    datas=datas,
+    datas=[('assets', 'assets')],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
@@ -36,23 +26,20 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
-    name="SubwaySurfersBlind",
+    name='SubwaySurfersBlind',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name="SubwaySurfersBlind",
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
 )
