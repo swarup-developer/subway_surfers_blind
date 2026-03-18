@@ -1,71 +1,77 @@
-Subway Surfers Blind Edition
-Changelog
+    Subway Surfers Blind Edition
+    Changelog
 
-Date: 2026-03-18
+    <<<<<<< main
+    Date: 2026-03-18
 
-Update Summary
-- Updated the game version to 1.1.2.
-- Added a persistent Achievements system with unlock tracking across runs.
-- Reworked How to Play and What's New into cleaner navigable dialog flows.
+    Update Summary
+    - Updated the game version to 1.1.2.
+    - Added a persistent Achievements system with unlock tracking across runs.
+    - Reworked How to Play and What's New into cleaner navigable dialog flows.
 
-Gameplay Changes
-- Added badges for lifetime coins, jumps, rolls, dodges, mystery box opens, best run distance, Word Hunt streaks, and total Season Hunt tokens, with automatic progress updates during gameplay.
-- Added version tracking so the game can remember which build has already been seen.
+    Gameplay Changes
+    - Added badges for lifetime coins, jumps, rolls, dodges, mystery box opens, best run distance, Word Hunt streaks, and total Season Hunt tokens, with automatic progress updates during gameplay.
+    - Added version tracking so the game can remember which build has already been seen.
 
-Audio or UI Updates
-- Changed SFX and Music volume adjustment to move by 1 per step instead of 10.
+    Audio or UI Updates
+    - Changed SFX and Music volume adjustment to move by 1 per step instead of 10.
 
-------------------------------------------------------------
+    ------------------------------------------------------------
 
-Date: 2026-03-13
+    Date: 2026-03-13
 
-Update Summary
-- Split the previous shared tracking toggle into separate controls for meters, coin counters, and quest changes.
-- Defaulted those progress-related options to off so players can enable only the information they want.
+    Update Summary
+    - Split the previous shared tracking toggle into separate controls for meters, coin counters, and quest changes.
+    - Defaulted those progress-related options to off so players can enable only the information they want.
 
-Gameplay Changes
-- Coin counters can now be disabled without removing coin spawns from the run.
-- Quest changes can now be disabled to stop mission, Word Hunt, and Season Hunt progression updates independently.
+    Gameplay Changes
+    - Coin counters can now be disabled without removing coin spawns from the run.
+    - Quest changes can now be disabled to stop mission, Word Hunt, and Season Hunt progression updates independently.
 
-Audio or UI Updates
-- Added separate Options menu toggles for Meters, Coin Counters, and Quest Changes.
-- Hid coin count and quest HUD sections when their related toggles are disabled.
+    Audio or UI Updates
+    - Added separate Options menu toggles for Meters, Coin Counters, and Quest Changes.
+    - Hid coin count and quest HUD sections when their related toggles are disabled.
 
-------------------------------------------------------------
+    ------------------------------------------------------------
 
-Date: 2026-03-10
+    Date: 2026-03-10
+    =======
+    Date: 2026-03-12
+    Version: 1.1.2
+    Title: Audio, Difficulty, and Lane Spawn Update
+    >>>>>>> main
 
-Update Summary
-- Improved HRTF and spatial audio so obstacle placement feels more believable in 3D space.
-- Refined hazard cues with clearer left-right spread, depth, and obstacle height positioning.
-- Added direction-aware hazard velocity so approaching warnings sound more natural before and after passing.
+    Update Summary
+    - Improved HRTF and spatial audio so obstacle placement feels more believable in 3D space.
+    - Refined hazard cues with clearer left-right spread, depth, and obstacle height positioning.
+    - Added direction-aware hazard velocity so approaching warnings sound more natural before and after passing.
 
-Gameplay Changes
-- Balanced difficulty more clearly across Easy, Normal, and Hard.
-- Easy mode now delays harder train setups and leaves more space between hazards.
-- Hard mode now introduces tighter pressure and earlier hazard density than Normal.
-- Fixed the lane escape bug by clamping the player back onto the valid three-lane track.
-- Adjusted coin and support spawning so pickups can appear more naturally in front of the player instead of favoring the center lane.
+    Gameplay Changes
+    - Balanced difficulty more clearly across Easy, Normal, and Hard.
+    - Easy mode now delays harder train setups and leaves more space between hazards.
+    - Hard mode now introduces tighter pressure and earlier hazard density than Normal.
+    - Fixed the lane escape bug by clamping the player back onto the valid three-lane track.
+    - Adjusted coin and support spawning so pickups can appear more naturally in front of the player instead of favoring the center lane.
 
-Flow and Menu Updates
-- Fixed the game-over and return-to-menu music flow.
-- Menu music now starts as soon as the game-over menu opens.
-- Returning to the main menu after a run now keeps menu music consistent instead of waiting for another menu interaction.
+    Flow and Menu Updates
+    - Fixed the game-over and return-to-menu music flow.
+    - Menu music now starts as soon as the game-over menu opens.
+    - Returning to the main menu after a run now keeps menu music consistent instead of waiting for another menu interaction.
 
-Display Updates
-- Made the game window resizable.
-- Enforced a minimum window size to keep menus and gameplay readable.
+    Display Updates
+    - Made the game window resizable.
+    - Enforced a minimum window size to keep menus and gameplay readable.
 
-------------------------------------------------------------
+    ------------------------------------------------------------
 
-Template For Future Entries
-Date: YYYY-MM-DD
+    Template For Future Entries
+    Date: YYYY-MM-DD
 
-Update Summary
-- Short summary item
+    Update Summary
+    - Short summary item
 
-Gameplay Changes
-- Change item
+    Gameplay Changes
+    - Change item
 
-Audio or UI Updates
-- Change item
+    Audio or UI Updates
+    - Change item
